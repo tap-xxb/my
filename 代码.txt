@@ -1,0 +1,162 @@
+pip install tensorflow matplotlib numpy
+
+import numpy as np
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.utils import to_categorical
+
+# 加载数据
+(X_train, y_train), (X_test, y_test) = mnist.load_data()
+# 拉平并归一化
+X_train = X_train.reshape(-1, 28*28).astype('float32') / 255.0
+X_test = X_test.reshape(-1, 28*28).astype('float32') / 255.0
+# 标签独热编码
+y_train_cat = to_categorical(y_train, 10)
+y_test_cat = to_categorical(y_test, 10)
+
+#插图1
+import matplotlib.pyplot as plt
+plt.figure(figsize=(10,2))
+for i in range(10):
+    plt.subplot(1,10,i+1)
+    plt.imshow(X_train[i].reshape(28,28), cmap='gray')
+    plt.axis('off')
+    plt.savefig('figure1.png', dpi=300, bbox_inches='tight')  # 保存为PNG文件
+plt.show()
+
+#插图2
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = ['SimHei']  # 或者 ['Microsoft YaHei']、['STSong'] 等
+plt.rcParams['axes.unicode_minus'] = False    # 正常显示负号
+
+plt.hist(X_train.flatten(), bins=50)
+plt.xlabel('Pixel value')
+plt.ylabel('Frequency')
+plt.title('MNIST像素值分布直方图')
+plt.show()
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras import Input
+
+model = Sequential([
+    Input(shape=(784,)),
+    Dense(128, activation='relu'),
+    Dense(10, activation='softmax')
+])
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+#插图3
+import matplotlib.pyplot as plt
+
+def draw_mlp_structure(input_num=784, hidden_num=128, output_num=10):
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.axis('off')
+    
+    # 层间横坐标
+    layer_x = [1, 4, 7]
+    # 每层神经元数
+    layer_sizes = [input_num, hidden_num, output_num]
+    # 每层神经元半径
+    radii = [0.03, 0.06, 0.06]  # 输入节点用点，隐藏和输出用圆
+
+    # 只绘制部分输入节点，避免太密集
+    input_show = 10  # 展示输入层的前10个节点
+    for i in range(input_show):
+        y = 1 - i * 0.1
+        circle = plt.Circle((layer_x[0], y), radii[0], color='skyblue')
+        ax.add_artist(circle)
+    ax.text(layer_x[0], 1.15, f'输入层\n({input_num})', ha='center')
+    ax.text(layer_x[0], -0.1, '...', ha='center', fontsize=12)
+
+    # 隐藏层
+    for i in range(10):
+        y = 1 - i * 0.1
+        circle = plt.Circle((layer_x[1], y), radii[1], color='lightgreen')
+        ax.add_artist(circle)
+    ax.text(layer_x[1], 1.15, f'隐藏层\n({hidden_num})', ha='center')
+    ax.text(layer_x[1], -0.1, '...', ha='center', fontsize=12)
+
+    # 输出层
+    for i in range(output_num):
+        y = 1 - i * 0.09
+        circle = plt.Circle((layer_x[2], y), radii[2], color='salmon')
+        ax.add_artist(circle)
+    ax.text(layer_x[2], 1.15, f'输出层\n({output_num})', ha='center')
+
+    # 画连接线（只画部分线条做示意）
+    for i in range(input_show):
+        for j in range(3):  # 只连隐藏层前三个
+            ax.plot([layer_x[0], layer_x[1]], [1 - i * 0.1, 1 - j * 0.1], 'gray', linewidth=0.5)
+    for j in range(3):
+        for k in range(3):  # 只连输出层前三个
+            ax.plot([layer_x[1], layer_x[2]], [1 - j * 0.1, 1 - k * 0.09], 'gray', linewidth=0.5)
+
+    ax.set_xlim(0, 8)
+    ax.set_ylim(-0.2, 1.3)
+    plt.title('多层感知机结构示意图')
+    plt.show()
+
+draw_mlp_structure()
+
+import matplotlib.pyplot as plt
+
+history = model.fit(X_train, y_train_cat, epochs=10, batch_size=128, validation_split=0.1, verbose=2)
+test_loss, test_acc = model.evaluate(X_test, y_test_cat)
+print(f"测试集准确率：{test_acc:.4f}")
+
+#插图4
+plt.plot(history.history['accuracy'], label='Train')
+plt.plot(history.history['val_accuracy'], label='Validation')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.title('训练与验证准确率变化')
+plt.show()
+
+y_pred = model.predict(X_test).argmax(axis=1)
+err_idx = np.where(y_pred != y_test)[0][:10]
+plt.figure(figsize=(10,2))
+for i, idx in enumerate(err_idx):
+    plt.subplot(1,10,i+1)
+    plt.imshow(X_test[idx].reshape(28,28), cmap='gray')
+    plt.title(f"T:{y_test[idx]},P:{y_pred[idx]}")
+    plt.axis('off')
+plt.show()
+
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.optimizers import SGD
+
+activations = ['relu', 'sigmoid', 'tanh']
+results = {}
+for act in activations:
+    mdl = Sequential([
+        Input(shape=(784,)),
+        Dense(128, activation=act),
+        Dense(10, activation='softmax')
+    ])
+    mdl.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    mdl.fit(X_train, y_train_cat, epochs=5, batch_size=128, verbose=0)
+    acc = mdl.evaluate(X_test, y_test_cat, verbose=0)[1]
+    results[act] = acc
+plt.bar(results.keys(), results.values())
+plt.xlabel('Activation Function')
+plt.ylabel('Test Accuracy')
+plt.title('不同激活函数的测试集准确率')
+plt.show()
+
+model_reg = Sequential([
+    Input(shape=(784,)),
+    Dense(128, activation='relu', kernel_regularizer=l2(0.01)),
+    Dropout(0.5),
+    Dense(10, activation='softmax')
+])
+model_reg.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+history_reg = model_reg.fit(X_train, y_train_cat, epochs=10, batch_size=128, validation_split=0.1, verbose=2)
+plt.plot(history_reg.history['accuracy'], label='Train')
+plt.plot(history_reg.history['val_accuracy'], label='Validation')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.title('正则化+Dropout训练与验证准确率')
+plt.show()
